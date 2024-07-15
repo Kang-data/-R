@@ -1,0 +1,159 @@
+# 데이터 가져오기:
+#   CSV 파일에서 데이터를 읽고 데이터셋의 구조를 탐색합니다.
+# 선형 및 로지스틱 회귀 분석:
+    변수들 간의 관계를 탐구하기 위해 선형 및 로지스틱 회귀 분석을 수행합니다.
+# 탐색적 데이터 분석(EDA):
+#   사고 데이터셋을 분석하여 고유한 항목, 결측치 및 중복 항목을 확인합니다.
+#   다양한 변수에 대한 요약 통계를 생성합니다.
+# 연구 질문:
+#   날씨, 조명 조건, 차량 유형 및 속도 제한에 따른 사고 건수와 비율을 조사합니다.
+#   속도 제한과 부상 심각도, 날씨와 부상 심각도 간의 관계를 회귀 모델을 사용하여 탐구합니다.
+# 랜덤 포레스트 모델:
+#   부상 심각도를 바탕으로 날씨를 예측하기 위해 랜덤 포레스트 모델을 학습합니다.
+#   ROC 곡선을 사용하여 모델을 평가합니다.
+# 모델 학습 및 평가:
+#   데이터를 훈련 및 테스트 세트로 분할합니다.
+#   10겹 교차 검증을 사용하여 여러 모델(LDA, CART, kNN, SVM, 랜덤 포레스트)을 학습합니다.
+#   모델의 정확도를 비교하고 최상의 모델(LDA)을 선택합니다.
+#   테스트 데이터에 대해 예측을 수행하고 혼동 행렬을 사용하여 모델을 평가합니다.
+
+
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, roc_auc_score
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
+from sklearn.preprocessing import LabelEncoder
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Data import
+ex = pd.read_csv("https://stats.idre.ucla.edu/stat/data/hsb2.csv")
+
+# Linear regression
+linear_model = LinearRegression().fit(ex[['write']], ex['female'])
+print(linear_model.summary())
+
+# Logistic regression
+logistic_model = LogisticRegression().fit(ex[['write']], ex['female'])
+print(logistic_model.summary())
+
+# Import binary data
+bin_df = pd.read_csv('~/Summer course/Project/binary.csv')
+print(bin_df.info())
+
+# Linear regression on binary data
+linear_model_bin = LinearRegression().fit(bin_df[['gre', 'gpa', 'rank']], bin_df['admit'])
+print(linear_model_bin.summary())
+
+# Logistic regression on binary data
+bin_df['admit'] = bin_df['admit'].astype('category')
+bin_df['rank'] = bin_df['rank'].astype('category')
+logistic_model_bin = LogisticRegression().fit(bin_df[['gre', 'gpa', 'rank']], bin_df['admit'])
+print(logistic_model_bin.summary())
+
+# Crash data import
+crash = pd.read_csv('~/Summer course/Project/Crash_Reporting_-_Drivers_Data.csv')
+print(crash.info())
+
+# Exploratory data analysis
+print(crash.describe())
+print(crash['Report.Number'].nunique())
+print(crash[~crash['Report.Number'].duplicated()].shape)
+print(crash['Vehicle.Body.Type'].unique())
+
+# Missing data check
+print(crash.isna().sum())
+
+# Research questions analysis
+def summarize_by_group(df, group_col):
+    summary_df = df.groupby(group_col).size().reset_index(name='Count')
+    summary_df['Percent'] = 100 * summary_df['Count'] / summary_df['Count'].sum()
+    return summary_df
+
+tab1 = summarize_by_group(crash, 'Weather')
+tab2 = summarize_by_group(crash, 'Light')
+tab3 = summarize_by_group(crash, 'Vehicle.Body.Type')
+tab4 = summarize_by_group(crash, 'Speed.Limit')
+
+print(tab1)
+print(tab2)
+print(tab3)
+print(tab4)
+
+# Relationship between speed limit and injury severity
+crash1 = crash.apply(lambda x: x.astype('category') if x.dtype == 'object' else x)
+linear_model_speed_injury = LinearRegression().fit(crash1[['Speed.Limit']], crash1['Injury.Severity'])
+print(linear_model_speed_injury.summary())
+
+# Logistic regression
+logistic_model_speed_injury = LogisticRegression().fit(crash1[['Speed.Limit']], crash1['Injury.Severity'])
+print(logistic_model_speed_injury.summary())
+
+# Random forest model
+rf_model = RandomForestClassifier().fit(crash1[['Injury.Severity']], crash1['Weather'])
+rf_predictions = rf_model.predict_proba(crash1[['Injury.Severity']])[:, 1]
+
+# ROC curve
+fpr, tpr, _ = roc_curve(crash1['Weather'], rf_predictions)
+roc_auc = roc_auc_score(crash1['Weather'], rf_predictions)
+plt.figure()
+plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic')
+plt.legend(loc="lower right")
+plt.show()
+
+# Train-test split
+train_d, test_d = train_test_split(crash1, test_size=0.2, random_state=7)
+
+# List types for each attribute
+print(train_d.dtypes)
+
+# Summarize the class distribution
+print(train_d['Weather'].value_counts(normalize=True) * 100)
+
+# Summarize attribute distributions
+print(train_d.describe())
+
+# Linear Discriminant Analysis (LDA)
+lda_model = LinearDiscriminantAnalysis().fit(train_d[['Injury.Severity']], train_d['Weather'])
+lda_predictions = lda_model.predict(test_d[['Injury.Severity']])
+print(confusion_matrix(test_d['Weather'], lda_predictions))
+print(accuracy_score(test_d['Weather'], lda_predictions))
+
+# Other models
+models = {
+    'LDA': LinearDiscriminantAnalysis(),
+    'CART': DecisionTreeClassifier(),
+    'kNN': KNeighborsClassifier(),
+    'SVM': SVC(probability=True),
+    'RF': RandomForestClassifier()
+}
+
+results = {}
+for name, model in models.items():
+    kfold = KFold(n_splits=10, random_state=7, shuffle=True)
+    cv_results = cross_val_score(model, train_d[['Injury.Severity']], train_d['Weather'], cv=kfold, scoring='accuracy')
+    results[name] = cv_results
+    print(f"{name}: {cv_results.mean()}")
+
+# Compare accuracy of models
+results_df = pd.DataFrame(results)
+results_df.boxplot()
+plt.show()
+
+# Best model summary
+best_model = lda_model
+print(best_model)
+
+# Confusion matrix for the best model on test data
+lda_predictions = best_model.predict(test_d[['Injury.Severity']])
+print(confusion_matrix(test_d['Weather'], lda_predictions))
+print(accuracy_score(test_d['Weather'], lda_predictions))
