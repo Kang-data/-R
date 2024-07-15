@@ -1,0 +1,143 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, roc_curve, roc_auc_score
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+
+# 데이터 가져오기
+url = "http://archive.ics.uci.edu/ml/machine-learning-databases/heart-disease/processed.cleveland.data"
+data = pd.read_csv(url, header=None)
+
+# 열 이름 설정
+data.columns = ["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "oldpeak", "slope", "ca", "thal", "hd"]
+
+# 데이터 구조 확인
+print(data.head())
+print(data.info())
+
+# "?"를 NA로 변경
+data.replace("?", np.nan, inplace=True)
+
+# sex 변수 변환
+data['sex'] = data['sex'].replace({0: 'F', 1: 'M'}).astype('category')
+
+# 다른 변수들도 factor로 변환
+categorical_vars = ['cp', 'fbs', 'restecg', 'exang', 'slope', 'ca', 'thal']
+for var in categorical_vars:
+    data[var] = data[var].astype('category')
+
+# hd 변수 변환
+data['hd'] = data['hd'].apply(lambda x: 'Healthy' if x == 0 else 'Unhealthy').astype('category')
+
+print(data.info())
+
+# 결측치가 있는 행 확인
+print(data[data.isna().any(axis=1)])
+data.dropna(inplace=True)
+print(data.info())
+
+# 교차 테이블 생성
+print(pd.crosstab(data['hd'], data['sex']))
+print(pd.crosstab(data['hd'], data['cp']))
+print(pd.crosstab(data['hd'], data['fbs']))
+print(pd.crosstab(data['hd'], data['restecg']))
+
+# 로지스틱 회귀 분석
+logistic_model = smf.logit(formula='hd ~ sex', data=data).fit()
+print(logistic_model.summary())
+
+# 모든 변수로 로지스틱 회귀 분석
+logistic_model_all = smf.logit(formula='hd ~ age + sex + cp + trestbps + chol + fbs + restecg + thalach + exang + oldpeak + slope + ca + thal', data=data).fit()
+print(logistic_model_all.summary())
+
+# Pseudo R2 계산
+ll_null = logistic_model_all.llnull
+ll_proposed = logistic_model_all.llf
+pseudo_r2 = (ll_null - ll_proposed) / ll_null
+print(f'Pseudo R2: {pseudo_r2}')
+
+# R2의 p-value 계산
+p_value = 1 - sm.stats.chisqprob(2 * (ll_proposed - ll_null), df=(len(logistic_model_all.params) - 1))
+print(f'P-value: {p_value}')
+
+# 예측 확률 계산 및 정렬
+predicted_data = pd.DataFrame({'probability_of_hd': logistic_model_all.predict(data), 'hd': data['hd']})
+predicted_data = predicted_data.sort_values(by='probability_of_hd')
+predicted_data['rank'] = np.arange(len(predicted_data)) + 1
+
+# ggplot 스타일 시각화
+plt.figure(figsize=(10, 6))
+sns.scatterplot(x='rank', y='probability_of_hd', hue='hd', data=predicted_data, style='hd', markers=['o', 'X'], s=100)
+plt.xlabel('Index')
+plt.ylabel('Predicted probability of getting heart disease')
+plt.title('Predicted probability of heart disease')
+plt.legend(title='Heart Disease')
+plt.savefig('heart_disease_probabilities.pdf')
+plt.show()
+
+# 혼동 행렬과 평가 지표
+le = LabelEncoder()
+y_true = le.fit_transform(data['hd'])
+y_pred = logistic_model_all.predict(data) >= 0.5
+cm = confusion_matrix(y_true, y_pred)
+print('Confusion Matrix:')
+print(cm)
+
+tn, fp, fn, tp = cm.ravel()
+accuracy = (tp + tn) / (tp + tn + fp + fn)
+error_rate = (fp + fn) / (tp + tn + fp + fn)
+sensitivity = tp / (tp + fn)
+specificity = tn / (tn + fp)
+precision = tp / (tp + fp)
+recall = tp / (tp + fn)
+f_measure = (2 * precision * recall) / (precision + recall)
+
+print(f'Accuracy: {accuracy}')
+print(f'Error Rate: {error_rate}')
+print(f'Sensitivity: {sensitivity}')
+print(f'Specificity: {specificity}')
+print(f'Precision: {precision}')
+print(f'Recall: {recall}')
+print(f'F-measure: {f_measure}')
+
+# ROC 곡선과 AUC
+fpr, tpr, thresholds = roc_curve(y_true, logistic_model_all.predict(data))
+roc_auc = roc_auc_score(y_true, logistic_model_all.predict(data))
+
+plt.figure(figsize=(10, 6))
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:0.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC)')
+plt.legend(loc='lower right')
+plt.show()
+
+# 랜덤 포레스트 모델
+from sklearn.ensemble import RandomForestClassifier
+
+rf_model = RandomForestClassifier().fit(data.drop(columns='hd'), y_true)
+rf_pred_prob = rf_model.predict_proba(data.drop(columns='hd'))[:, 1]
+
+# ROC for Random Forest
+fpr_rf, tpr_rf, _ = roc_curve(y_true, rf_pred_prob)
+roc_auc_rf = roc_auc_score(y_true, rf_pred_prob)
+
+plt.figure(figsize=(10, 6))
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'Logistic Regression (area = {roc_auc:0.2f})')
+plt.plot(fpr_rf, tpr_rf, color='green', lw=2, label=f'Random Forest (area = {roc_auc_rf:0.2f})')
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve Comparison')
+plt.legend(loc='lower right')
+plt.show()
