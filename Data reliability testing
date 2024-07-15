@@ -1,0 +1,80 @@
+####################
+#Data reliability testing
+
+import pandas as pd
+import numpy as np
+
+# Read the CSV file
+flight = pd.read_csv("C:/Users/rkdgu/방학 데분 특강//flights.csv")
+
+# Select the first 10000 rows
+flight = flight.iloc[:10000, :]
+
+# Overview of the dataframe
+print(flight.info())
+print(flight.describe())
+
+# Total number of records
+print(flight.shape)
+
+# Missing entry
+na_positions = np.where(flight.isna())
+na_count = flight.isna().sum().sum()
+print("NA positions:", na_positions)
+print("Total NA count:", na_count)
+
+# Calculate the mean for the column 'dep_delay'
+mean_dep_delay = flight['dep_delay'].mean() # Will return NaN due to NA values
+print(mean_dep_delay)
+
+mean_dep_delay_no_na = flight['dep_delay'].mean(skipna=True)
+print(mean_dep_delay_no_na)
+
+# Duplicate records
+unique_tailnum_count = flight['tailnum'].nunique()
+print(unique_tailnum_count)
+
+unique_tailnum = flight.drop_duplicates(subset='tailnum')
+print(unique_tailnum)
+
+# Data type mismatch
+print(flight.head())
+mean_distance = flight['distance'].mean()
+print(mean_distance)
+
+flight.at[2, 'distance'] = "far"
+print(flight.head())
+
+try:
+    mean_distance = flight['distance'].mean()
+except TypeError as e:
+    print(f"Error: {e}")
+
+# Invalid data entry
+flight.at[2, 'time_hour'] = 354
+print(flight.head())
+
+# Convert 'time_hour' to datetime
+flight['time_hour'] = pd.to_datetime(flight['time_hour'], errors='coerce')
+print(flight.info())
+
+print(flight.at[2, 'time_hour']) # Will show NaT
+
+# Outside a designated value range or date range
+unique_days = flight['day'].unique()
+print(unique_days)
+
+# Filter 'day' from 1 to 10
+f1 = flight[(flight['day'] >= 1) & (flight['day'] <= 10)]
+unique_days_filtered = f1['day'].unique()
+print(unique_days_filtered)
+
+# Logic check, for example, dep_delay = dep_time - sched_dep_time
+dep_delay_check = flight['dep_delay'] == (flight['dep_time'] - flight['sched_dep_time'])
+print(dep_delay_check.value_counts())
+
+arr_delay_check = flight['arr_delay'] == (flight['arr_time'] - flight['sched_arr_time'])
+print(arr_delay_check.value_counts())
+
+air_time_check = flight['air_time'] < (flight['arr_time'] - flight['dep_time'])
+print(air_time_check.value_counts())
