@@ -1,0 +1,105 @@
+import pandas as pd
+import geopandas as gpd
+import matplotlib.pyplot as plt
+from shapely.geometry import Point
+
+# Load USA map data
+usa = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+usa = usa[usa['continent'] == 'North America']
+
+print(usa.shape)
+print(usa.head())
+
+# Plot USA map
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+usa.plot(ax=ax)
+plt.show()
+
+# Plot with color and border settings
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+usa.plot(ax=ax, edgecolor='red', facecolor='none')
+plt.show()
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+usa.plot(ax=ax, color='violet', edgecolor='blue')
+plt.show()
+
+# Load world map data
+world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+print(world.shape)
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+world.plot(ax=ax)
+plt.show()
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+world.plot(ax=ax, edgecolor='red', facecolor='none')
+plt.show()
+
+# Points for the labs
+labs = pd.DataFrame({
+    'long': [-122.064873, -122.306417],
+    'lat': [36.951968, 47.644855],
+    'names': ["SWFSC-FED", "NWFSC"]
+})
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+usa.plot(ax=ax, color='violet', edgecolor='blue')
+plt.scatter(labs['long'], labs['lat'], color='black', s=100)
+plt.scatter(labs['long'], labs['lat'], color='yellow', s=80)
+plt.show()
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+usa.plot(ax=ax, color='violet', edgecolor='blue')
+plt.scatter(labs['long'], labs['lat'], color='black', s=100)
+plt.scatter(labs['long'], labs['lat'], color='yellow', s=80)
+plt.show()
+
+# Load US states map data
+states = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+states = states[(states['continent'] == 'North America') & (states['name'] == 'United States of America')]
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+states.boundary.plot(ax=ax, color='white')
+plt.show()
+
+# Subset for West Coast
+west_coast = states[states['name'].isin(['California', 'Oregon', 'Washington'])]
+
+fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+west_coast.plot(ax=ax, color='palegreen', edgecolor='black')
+plt.show()
+
+# California county data
+counties = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+ca_county = counties[counties['name'] == 'California']
+
+ca_base = ca_county.plot(color='gray', edgecolor='black')
+plt.show()
+
+ca_base = ca_county.plot(color='gray', edgecolor='black')
+ca_county.boundary.plot(ax=ca_base, edgecolor='white')
+plt.show()
+
+# Read and process population and area data
+import re
+
+with open('data/ca-counties-wikipedia.txt', 'r') as file:
+    x = file.readlines()
+
+pop_and_area = [re.findall(r'^([a-zA-Z ]+)County\t.*\t([0-9,]{2,10})\t([0-9,]{2,10}) sq mi$', line) for line in x]
+pop_and_area = [item for sublist in pop_and_area for item in sublist if sublist]
+
+pop_and_area = pd.DataFrame(pop_and_area, columns=['subregion', 'population', 'area'])
+pop_and_area['population'] = pop_and_area['population'].str.replace(',', '').astype(int)
+pop_and_area['area'] = pop_and_area['area'].str.replace(',', '').astype(int)
+pop_and_area['subregion'] = pop_and_area['subregion'].str.lower().str.strip()
+
+print(pop_and_area.head())
+
+# Read other datasets
+sisquoc = pd.read_csv('data/sisquoc-points.txt', sep='\t')
+print(sisquoc.head())
+
+bike = pd.read_csv('data/bike-ride.csv')
+print(bike.head())
