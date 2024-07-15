@@ -8,3 +8,127 @@ for col in df.columns :
 #drop columns
 to_drop = ["month", "day"]
 df.drop(to_drop, inplace = True, axis = 1)
+
+#특정 열을 index로 바꾸고 싶을때
+df = df.set_index("Unnamed : 0")
+
+df.loc[5]  # 5번째 행의 모든 열 데이터들 출력
+
+#data type 바꾸기
+df.year = df.year.astype(str)
+
+#rename columns
+new_names = {"year" : "Fiscal Year"}
+df.rename(columns = new_names, inplace = True)
+
+# Data cleaning
+
+import pandas as pd
+from nycflights13 import flights, weather, planes, airports, airlines
+
+# File import/export
+# nycflights13 library provides flight data from January 1 to December 31, 2013, from New York airports
+
+# Save flights dataframe as a CSV file
+flights.to_csv("C:/Users/rkdgu/방학 데분 특강//flights.csv", index=False)
+
+# Read the saved flights.csv file into a flights dataframe
+flights = pd.read_csv("C:/Users/rkdgu/방학 데분 특강//flights.csv")
+
+# Filter flights dataframe where origin is "LGA"
+flights_lga = flights[flights['origin'] == "LGA"]
+print(flights_lga.head())
+
+# Filter flights dataframe where month is 1
+flights_january = flights[flights['month'] == 1]
+print(flights_january.head())
+
+# Filter flights where origin is LGA and select specific columns
+flights_lga_selected = flights_lga[['year', 'month', 'day', 'dep_time']]
+print(flights_lga_selected.head())
+
+# Check if NA
+is_na_origin = flights['origin'].isna()
+print(is_na_origin)
+
+# Unique values for NA check
+unique_na_origin = is_na_origin.unique()
+print(unique_na_origin)
+
+# Check if NA in dep_time
+is_na_dep_time = flights['dep_time'].isna()
+unique_na_dep_time = is_na_dep_time.unique()
+print(unique_na_dep_time)
+
+# Or use summary
+print(flights.describe())
+print(flights['arr_time'].describe())
+
+# Intentionally create one NA
+flights.loc[4, 'origin'] = None
+print(flights['origin'])
+
+# Check NA again
+is_na_origin = flights['origin'].isna()
+unique_na_origin = is_na_origin.unique()
+print(unique_na_origin)
+
+# Distinct values - four distinct values
+distinct_origin = flights['origin'].drop_duplicates()
+print(distinct_origin)
+
+# Summarize
+distinct_origin_count = flights['origin'].nunique()
+print(distinct_origin_count)
+
+# Flights dataframe with count of NA in origin
+na_origin_count = flights['origin'].isna().sum()
+print(na_origin_count)
+
+# Count unique, missing, and median values
+median_distance = flights['distance'].median(skipna=True)
+summary_stats = {
+    'n': distinct_origin_count,
+    'na': na_origin_count,
+    'med': median_distance
+}
+print(summary_stats)
+
+# Change numeric to character and see what happens
+flights['distance'] = flights['distance'].astype(str)
+print(flights.info())
+
+try:
+    summary_stats = {
+        'n': flights['origin'].nunique(),
+        'na': flights['origin'].isna().sum(),
+        'med': flights['distance'].median(skipna=True)
+    }
+except TypeError as e:
+    print(f"Error: {e}")
+
+# Convert back to numeric
+flights['distance'] = pd.to_numeric(flights['distance'])
+print(flights.info())
+
+# Mutate missing values
+median_arr_time = flights['arr_time'].median(skipna=True)
+flights['arr_time'] = flights['arr_time'].fillna(median_arr_time)
+print(flights.head())
+
+# Non-standard missing values
+flights.loc[6, 'origin'] = 'na'
+flights.loc[8, 'origin'] = 'N/A'
+print(flights)
+
+# Check NA count - will show only one missing value
+na_origin_count = flights['origin'].isna().sum()
+print(na_origin_count)
+
+# Replace 'na' and 'N/A' with missing values
+flights['origin'] = flights['origin'].replace(['na', 'N/A'], None)
+na_origin_count = flights['origin'].isna().sum()
+print(na_origin_count)
+
+print(flights)
+
